@@ -75,6 +75,22 @@ export default function App() {
   const handleRunCode = async () => {
     if (!filename || isRunning) return;
 
+    // Derive the language from the file extension
+    const fileExtension = filename.split('.').pop();
+    let derivedLanguage = '';
+    if (fileExtension === 'py') {
+      derivedLanguage = 'python';
+    } else if (fileExtension === 'js') {
+      derivedLanguage = 'javascript';
+    } else if (fileExtension === 'cpp') {
+      derivedLanguage = 'cpp';
+    } else if (fileExtension === 'html') {
+      derivedLanguage = 'html';
+    } else {
+      terminal.current.writeln('\x1b[1;31mUnsupported file type.\x1b[0m');
+      return;
+    }
+
     setIsRunning(true);
     terminal.current.writeln(`\r\n\x1b[1;33mRunning ${filename}...\x1b[0m`);
 
@@ -82,7 +98,7 @@ export default function App() {
       const response = await axios.post('http://localhost:5000/execute', {
         filename,
         code,
-        language,
+        language: derivedLanguage, // Pass the derived language
       });
 
       setOutput(response.data.output);
@@ -98,7 +114,23 @@ export default function App() {
 
   const handleFileClick = async (file) => {
     setFilename(file.name);
-    setLanguage(file.language);
+
+    // Derive the language from the file extension
+    const fileExtension = file.name.split('.').pop();
+    let derivedLanguage = '';
+    if (fileExtension === 'py') {
+      derivedLanguage = 'python';
+    } else if (fileExtension === 'js') {
+      derivedLanguage = 'javascript';
+    } else if (fileExtension === 'cpp') {
+      derivedLanguage = 'cpp';
+    } else if (fileExtension === 'html') {
+      derivedLanguage = 'html';
+    } else {
+      terminal.current.writeln('\x1b[1;31mUnsupported file type.\x1b[0m');
+      return;
+    }
+    setLanguage(derivedLanguage);
 
     try {
       const response = await axios.get(`http://localhost:5000/file/${file.name}`);

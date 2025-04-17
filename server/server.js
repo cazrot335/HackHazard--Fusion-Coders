@@ -104,7 +104,7 @@ app.post('/execute', (req, res) => {
 
     let command = '';
     if (language === 'python') {
-      command = `python3 ${filePath}`; // Use python3 for Python execution
+      command = `python3 ${filePath}`;
     } else if (language === 'javascript') {
       command = `node ${filePath}`;
     } else if (language === 'cpp') {

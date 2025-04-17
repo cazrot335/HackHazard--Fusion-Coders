@@ -7,7 +7,6 @@ def fibonacci(n):
         a, b = b, a + b
     return sequence
 
-# Example usage
 if __name__ == "__main__":
-    n = 5
+    n = int(input("Enter the number of terms: "))
     print("Fibonacci sequence:", fibonacci(n))

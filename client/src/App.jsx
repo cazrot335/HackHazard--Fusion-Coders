@@ -14,9 +14,11 @@ export default function App() {
   const [language, setLanguage] = useState('');
   const [files, setFiles] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false); // New state for input handling
   const terminalRef = useRef(null);
   const terminal = useRef(null);
   const fitAddon = useRef(null);
+  const hasInitializedTerminal = useRef(false); // Track if the terminal has been initialized
 
   useEffect(() => {
     // Initialize xterm.js terminal with fit addon
@@ -38,8 +40,20 @@ export default function App() {
     if (terminalRef.current) {
       terminal.current.open(terminalRef.current);
       fitAddon.current.fit();
-      terminal.current.writeln('\x1b[1;34mWelcome to the Web IDE Terminal!\x1b[0m');
+
+      // Display the welcome message only once
+      if (!hasInitializedTerminal.current) {
+        terminal.current.writeln('\x1b[1;34mWelcome to the Web IDE Terminal!\x1b[0m');
+        hasInitializedTerminal.current = true;
+      }
     }
+
+    // Handle user input in the terminal
+    terminal.current.onData((data) => {
+      if (isWaitingForInput) {
+        handleUserInput(data.trim());
+      }
+    });
 
     // Handle window resize to fit terminal
     const handleResize = () => {
@@ -52,7 +66,7 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [isWaitingForInput]);
 
   useEffect(() => {
     // Fetch files from the backend
@@ -84,8 +98,6 @@ export default function App() {
       derivedLanguage = 'javascript';
     } else if (fileExtension === 'cpp') {
       derivedLanguage = 'cpp';
-    } else if (fileExtension === 'html') {
-      derivedLanguage = 'html';
     } else {
       terminal.current.writeln('\x1b[1;31mUnsupported file type.\x1b[0m');
       return;
@@ -98,17 +110,53 @@ export default function App() {
       const response = await axios.post('http://localhost:5000/execute', {
         filename,
         code,
-        language: derivedLanguage, // Pass the derived language
+        language: derivedLanguage,
+        userInput: '', // Initially no user input
       });
 
-      setOutput(response.data.output);
-      terminal.current.writeln(`\x1b[32m${response.data.output}\x1b[0m`);
-      terminal.current.writeln('\r\n\x1b[1;32mExecution completed successfully.\x1b[0m');
+      if (response.data.output.includes('Enter')) {
+        // If the program is waiting for input
+        setIsWaitingForInput(true);
+        terminal.current.write(response.data.output); // Append output
+      } else {
+        // If the program has completed execution
+        setOutput(response.data.output);
+        terminal.current.write(`\x1b[32m${response.data.output}\x1b[0m`);
+        terminal.current.writeln('\r\n\x1b[1;32mExecution completed successfully.\x1b[0m');
+      }
     } catch (error) {
       terminal.current.writeln('\x1b[1;31mError executing code.\x1b[0m');
       console.error('Error executing code:', error);
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleUserInput = async (input) => {
+    setIsWaitingForInput(false);
+    terminal.current.writeln(`\x1b[1;33mUser input: ${input}\x1b[0m`);
+
+    try {
+      const response = await axios.post('http://localhost:5000/execute', {
+        filename,
+        code,
+        language,
+        userInput: input, // Pass user input to the backend
+      });
+
+      if (response.data.output.includes('Enter')) {
+        // If the program is still waiting for input
+        setIsWaitingForInput(true);
+        terminal.current.write(response.data.output); // Append output
+      } else {
+        // If the program has completed execution
+        setOutput(response.data.output);
+        terminal.current.write(`\x1b[32m${response.data.output}\x1b[0m`);
+        terminal.current.writeln('\r\n\x1b[1;32mExecution completed successfully.\x1b[0m');
+      }
+    } catch (error) {
+      terminal.current.writeln('\x1b[1;31mError executing code.\x1b[0m');
+      console.error('Error executing code:', error);
     }
   };
 

@@ -83,18 +83,13 @@ app.put('/rename-file', (req, res) => {
 
 // Execute code
 app.post('/execute', (req, res) => {
-  const { filename, code, language } = req.body;
+  const { filename, code, language, userInput } = req.body;
 
   if (!filename || !code || !language) {
     return res.status(400).json({ error: 'Missing required fields: filename, code, or language.' });
   }
 
   const filePath = path.join(filesDir, filename);
-
-  // Validate if the file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(400).json({ error: `File ${filename} does not exist.` });
-  }
 
   // Write the provided code to the file
   fs.writeFile(filePath, code, (err) => {
@@ -110,19 +105,46 @@ app.post('/execute', (req, res) => {
     } else if (language === 'cpp') {
       const outputFilePath = filePath.replace('.cpp', '');
       command = `g++ ${filePath} -o ${outputFilePath} && ${outputFilePath}`;
-    } else if (language === 'html') {
-      return res.json({ output: `HTML file created. Open ${filePath} in a browser.` });
     } else {
       return res.status(400).json({ error: 'Unsupported language.' });
     }
 
     // Execute the command
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        return res.json({ output: stderr });
+    const child = exec(command);
+    let stdout = '';
+    let stderr = '';
+    let responseSent = false; // Flag to track if a response has been sent
+
+    child.stdout.on('data', (data) => {
+      stdout += data;
+
+      // Check if the program is waiting for input
+      if (data.includes('Enter') && !responseSent) {
+        responseSent = true; // Mark response as sent
+        res.json({ output: stdout });
+        child.kill(); // Stop the process to wait for input
       }
-      res.json({ output: stdout });
     });
+
+    child.stderr.on('data', (data) => {
+      stderr += data;
+    });
+
+    child.on('close', (code) => {
+      if (!responseSent) {
+        responseSent = true; // Mark response as sent
+        if (code !== 0) {
+          return res.json({ output: stderr });
+        }
+        res.json({ output: stdout });
+      }
+    });
+
+    // Pass user input to the program
+    if (userInput) {
+      child.stdin.write(userInput + '\n');
+      child.stdin.end();
+    }
   });
 });
 

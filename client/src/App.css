@@ -151,7 +151,9 @@ button.menu-item {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  resize: vertical;
+  resize: vertical; /* Allow vertical resizing */
+  min-height: 100px; /* Minimum height for the terminal */
+  max-height: 500px; /* Maximum height for the terminal */
 }
 
 .terminal-header {
@@ -164,6 +166,7 @@ button.menu-item {
   display: flex;
   align-items: center;
   border-bottom: 1px solid #3e3e42;
+  cursor: ns-resize; /* Show resize cursor */
 }
 
 .terminal-header .icon {
@@ -178,6 +181,26 @@ button.menu-item {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 13px;
   background-color: #121212;
+  color: #d4d4d4;
+  white-space: pre-wrap; /* Preserve whitespace and line breaks */
+}
+
+.terminal-input {
+  display: flex;
+  padding: 8px;
+  background-color: #1e1e1e;
+  border-top: 1px solid #444;
+}
+
+.terminal-input input {
+  flex-grow: 1;
+  background-color: #121212;
+  color: #d4d4d4;
+  border: none;
+  padding: 8px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 14px;
+  outline: none;
 }
 
 /* XTerm.js styling overrides */

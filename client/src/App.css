@@ -275,7 +275,7 @@ button.menu-item {
   margin-bottom: 8px;
   padding: 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .chatbot-message.user {
@@ -407,4 +407,41 @@ button.menu-item {
 
 .loading {
   animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Code snippet container */
+.code-snippet {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 16px;
+  border-radius: 4px;
+  position: relative;
+  font-family: 'Courier New', Courier, monospace;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+/* Preformatted text inside the code snippet */
+.code-snippet pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Copy button inside the code snippet */
+.copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.copy-button:hover {
+  background-color: #1177bb;
 }

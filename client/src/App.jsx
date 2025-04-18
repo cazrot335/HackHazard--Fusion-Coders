@@ -15,6 +15,23 @@ function debounce(func, delay) {
   };
 }
 
+const copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Code copied to clipboard!');
+  }).catch((err) => {
+    console.error('Failed to copy text: ', err);
+  });
+};
+
+const CodeSnippet = ({ code }) => (
+  <div className="code-snippet">
+    <pre>{code}</pre>
+    <button className="copy-button" onClick={() => copyToClipboard(code)}>
+      Copy
+    </button>
+  </div>
+);
+
 export default function App() {
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
@@ -25,41 +42,40 @@ export default function App() {
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [userMessage, setUserMessage] = useState('');
-  const [isChatOpen, setIsChatOpen] = useState(false); // State for chat section visibility
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const terminalRef = useRef(null);
   const terminal = useRef(null);
   const fitAddon = useRef(null);
   const hasInitializedTerminal = useRef(false);
-  const terminalContainerRef = useRef(null); // Ref for terminal container
+  const terminalContainerRef = useRef(null);
 
   useEffect(() => {
-    // Initialize xterm.js terminal with fit addon only if not already initialized
-  if (!terminal.current) {
-    terminal.current = new Terminal({
-      fontSize: 13,
-      fontFamily: '"Consolas", "Courier New", monospace',
-      theme: {
-        background: "#121212",
-        foreground: "#d4d4d4",
-        cursor: "#ffffff",
-        cursorAccent: "#000000",
-        selection: "rgba(255, 255, 255, 0.3)",
-      },
-    });
+    if (!terminal.current) {
+      terminal.current = new Terminal({
+        fontSize: 13,
+        fontFamily: '"Consolas", "Courier New", monospace',
+        theme: {
+          background: "#121212",
+          foreground: "#d4d4d4",
+          cursor: "#ffffff",
+          cursorAccent: "#000000",
+          selection: "rgba(255, 255, 255, 0.3)",
+        },
+      });
 
-    fitAddon.current = new FitAddon();
-    terminal.current.loadAddon(fitAddon.current);
+      fitAddon.current = new FitAddon();
+      terminal.current.loadAddon(fitAddon.current);
 
-    if (terminalRef.current) {
-      terminal.current.open(terminalRef.current);
-      fitAddon.current.fit();
+      if (terminalRef.current) {
+        terminal.current.open(terminalRef.current);
+        fitAddon.current.fit();
 
-      if (!hasInitializedTerminal.current) {
-        terminal.current.writeln('\x1b[1;34mWelcome to the Web IDE Terminal!\x1b[0m');
-        hasInitializedTerminal.current = true;
+        if (!hasInitializedTerminal.current) {
+          terminal.current.writeln('\x1b[1;34mWelcome to the Web IDE Terminal!\x1b[0m');
+          hasInitializedTerminal.current = true;
+        }
       }
     }
-  }
 
     terminal.current.onData((data) => {
       if (isWaitingForInput) {
@@ -78,7 +94,6 @@ export default function App() {
       window.removeEventListener('resize', handleResize);
     };
   }, [isWaitingForInput]);
-
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -278,21 +293,26 @@ export default function App() {
     }
   };
 
-  // chat 
   const handleSendMessage = async () => {
     if (!userMessage.trim()) return;
 
     setChatMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
 
-    const response = await fetch('http://localhost:5000/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMessage }),
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch('http://localhost:5000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage }),
+      });
 
-    setChatMessages((prev) => [...prev, { sender: 'ai', text: data.response }]);
-    setUserMessage('');
+      const data = await response.json();
+      setChatMessages((prev) => [...prev, { sender: 'ai', text: data.response }]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setChatMessages((prev) => [...prev, { sender: 'ai', text: 'Error processing your request.' }]);
+    } finally {
+      setUserMessage('');
+    }
   };
 
   const handleChatToggle = () => {
@@ -301,7 +321,7 @@ export default function App() {
 
   const handleTerminalResize = (e) => {
     const terminalContainer = terminalContainerRef.current;
-    const newHeight = window.innerHeight - e.clientY - 40; // Adjust for top bar height
+    const newHeight = window.innerHeight - e.clientY - 40;
     if (newHeight >= 100 && newHeight <= window.innerHeight * 0.5) {
       terminalContainer.style.height = `${newHeight}px`;
     }
@@ -319,7 +339,6 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* Top bar */}
       <div className="top-bar">
         <div className="menu">
           <span className="menu-item">Web IDE</span>
@@ -344,9 +363,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main content */}
       <div className={`main-content ${isChatOpen ? 'chat-open' : ''}`}>
-        {/* File explorer */}
         <div className="file-explorer">
           <div className="explorer-header">EXPLORER</div>
           <div className="folder">
@@ -369,7 +386,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Editor and Terminal */}
         <div className="editor-terminal">
           <div className="editor-output">
             <div className="editor-tabs">
@@ -406,7 +422,6 @@ export default function App() {
               }}
             />
 
-            {/* Terminal */}
             <div
               ref={terminalContainerRef}
               className="terminal-container"
@@ -424,7 +439,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Chat Section */}
         {isChatOpen && (
           <div className="chatbot">
             <div className="chatbot-header">AI Assistant</div>
@@ -433,18 +447,16 @@ export default function App() {
                 <div
                   key={index}
                   className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
-                >
-                  {msg.text}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: msg.text }}
+                />
               ))}
             </div>
             <div className="chatbot-input">
               <input
                 type="text"
-                placeholder="Ask me anything..."
                 value={userMessage}
                 onChange={(e) => setUserMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Type your message..."
               />
               <button onClick={handleSendMessage}>Send</button>
             </div>
@@ -452,7 +464,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Status bar */}
       <div className="status-bar">
         <div>Status: Ready</div>
       </div>

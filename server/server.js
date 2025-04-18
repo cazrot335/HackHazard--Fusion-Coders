@@ -229,22 +229,23 @@ app.post('/chat', async (req, res) => {
   const { message } = req.body;
 
   try {
-    // Call Groq API for chat completion
     const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: message,
-        },
-      ],
-      model: 'llama-3.3-70b-versatile', // Replace with the desired model
+      messages: [{ role: 'user', content: message }],
+      model: 'llama-3.3-70b-versatile',
     });
 
-    // Extract the response content
     const responseContent = chatCompletion.choices[0]?.message?.content || 'No response from the model.';
 
-    // Send the response back to the frontend
-    res.json({ response: responseContent });
+    // Format the response for better readability
+    const formattedResponse = responseContent
+      .replace(/```(.*?)```/gs, (match, code) => {
+        return `<div class="code-snippet"><pre>${code}</pre><button class="copy-button" onclick="copyToClipboard(\`${code}\`)">Copy</button></div>`;
+      })
+      .replace(/\n/g, '<br>') // Replace newlines with HTML line breaks
+      .replace(/(\*\*.*?\*\*)/g, '<strong>$1</strong>') // Bold text
+      .replace(/(#+\s.*)/g, '<h3>$1</h3>'); // Convert headings
+
+    res.json({ response: formattedResponse });
   } catch (error) {
     console.error('Error with Groq API:', error.message || error);
     res.status(500).json({ error: 'Failed to process the request.' });

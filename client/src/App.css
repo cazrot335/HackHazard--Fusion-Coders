@@ -1,0 +1,410 @@
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Main app container */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Top bar with menu and run button */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #252526;
+  padding: 0 16px;
+  height: 40px;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.top-bar .top-bar-actions {
+  display: flex;
+  gap: 8px; /* Add spacing between buttons */
+  align-items: center;
+}
+
+.menu {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.menu-item {
+  font-size: 13px;
+  color: #cccccc;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.menu-item:first-child {
+  color: #ffffff;
+  font-weight: 600;
+  margin-right: auto; /* Pushes the first menu item to the left */
+}
+
+.menu-item:hover:not(:first-child) {
+  background-color: #3e3e42;
+}
+
+button.menu-item {
+  background-color: transparent;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px; /* Adds spacing between buttons */
+}
+
+.run-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-weight: 500;
+  user-select: none;
+}
+
+.run-button:hover {
+  background-color: #1177bb;
+}
+
+.run-button:active {
+  background-color: #0d5c91;
+}
+
+.icon {
+  margin-right: 4px;
+}
+
+/* Main content area */
+.main-content {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.main-content.chat-open {
+  margin-right: 300px; /* Reserve space for the chat section */
+}
+
+/* File explorer sidebar */
+.file-explorer {
+  width: 250px;
+  background-color: #252526;
+  border-right: 1px solid #3e3e42;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.explorer-header {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #cccccc;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.folder {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cccccc;
+}
+
+.file-list {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.file-item {
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.file-item:hover {
+  background-color: #3e3e42;
+}
+
+.file-item.active {
+  background-color: #1e1e1e;
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.file-actions .icon {
+  cursor: pointer;
+  color: #cccccc;
+  transition: color 0.2s ease;
+}
+
+.file-actions .icon:hover {
+  color: #ffffff;
+}
+
+/* Editor and terminal area */
+.editor-terminal {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.editor-output {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.editor-tabs {
+  background-color: #252526;
+  display: flex;
+  height: 35px;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.tab {
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  color: #969696;
+  font-size: 13px;
+  height: 100%;
+  cursor: pointer;
+  user-select: none;
+  border-right: 1px solid #3e3e42;
+}
+
+.tab.active-tab {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+/* Terminal styles */
+.terminal-container {
+  height: 200px;
+  background-color: #1e1e1e;
+  border-top: 1px solid #3e3e42;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative; /* Required for the resize handle */
+  min-height: 100px; /* Prevents collapsing too much */
+  max-height: 50%; /* Prevents expanding too much */
+}
+
+/* Resize handle at the top of the terminal */
+.terminal-resize-handle {
+  height: 5px;
+  background-color: #3e3e42;
+  cursor: row-resize;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+}
+
+/* Chat section */
+.chatbot {
+  width: 300px;
+  background-color: #252526;
+  border-left: 1px solid #3e3e42;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  right: 0;
+  top: 40px;
+  bottom: 0;
+  z-index: 10; /* Ensure it appears above other elements */
+}
+
+.chatbot-header {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #cccccc;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.chatbot-messages {
+  flex-grow: 1;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.chatbot-message {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.chatbot-message.user {
+  background-color: #0e639c;
+  color: white;
+  align-self: flex-end;
+}
+
+.chatbot-message.ai {
+  background-color: #3e3e42;
+  color: #cccccc;
+  align-self: flex-start;
+}
+
+.chatbot-input {
+  display: flex;
+  padding: 8px;
+  background-color: #1e1e1e;
+  border-top: 1px solid #3e3e42;
+}
+
+.chatbot-input input {
+  flex-grow: 1;
+  background-color: #121212;
+  color: #d4d4d4;
+  border: none;
+  padding: 8px;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+
+.chatbot-input button {
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.chatbot-input button:hover {
+  background-color: #1177bb;
+}
+
+/* XTerm.js styling overrides */
+.xterm {
+  padding: 4px;
+}
+
+.xterm-viewport {
+  background-color: #121212 !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .top-bar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 16px;
+  }
+  
+  .run-button {
+    margin-top: 8px;
+  }
+  
+  .terminal-container {
+    height: 200px;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3e3e42;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #505050;
+}
+
+/* Monaco Editor custom styles */
+.monaco-editor .margin {
+  background-color: #1e1e1e !important;
+}
+
+/* File button styles */
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.file-button:hover {
+  background-color: #1177bb;
+}
+
+/* Animation for loading state */
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.loading {
+  animation: pulse 1.5s infinite ease-in-out;
+}

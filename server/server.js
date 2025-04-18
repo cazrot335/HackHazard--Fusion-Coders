@@ -2,10 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const path = require('path');
 const dotenv = require('dotenv');
 const Groq = require('groq-sdk');
+const axios = require('axios');
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,21 @@ if (!fs.existsSync(filesDir)) {
 
 // Initialize Groq SDK
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// Spawn the Python process for the model server
+const pythonProcess = spawn('python3', ['server.py']); // Use 'python' or 'python3' depending on your system
+
+pythonProcess.stdout.on('data', (data) => {
+  console.log(`Python Server: ${data}`);
+});
+
+pythonProcess.stderr.on('data', (data) => {
+  console.error(`Python Server Error: ${data}`);
+});
+
+pythonProcess.on('close', (code) => {
+  console.log(`Python server exited with code ${code}`);
+});
 
 // Fetch all files
 app.get('/files', (req, res) => {
@@ -126,11 +142,10 @@ app.post('/execute', (req, res) => {
     child.stdout.on('data', (data) => {
       stdout += data;
 
-      // Check if the program is waiting for input
+      // If the program requests input, send the response and wait for input
       if (data.includes('Enter') && !responseSent) {
         responseSent = true; // Mark response as sent
-        res.json({ output: stdout });
-        child.kill(); // Stop the process to wait for input
+        res.json({ output: stdout, waitingForInput: true });
       }
     });
 
@@ -142,9 +157,9 @@ app.post('/execute', (req, res) => {
       if (!responseSent) {
         responseSent = true; // Mark response as sent
         if (code !== 0) {
-          return res.json({ output: stderr });
+          return res.json({ output: stderr, waitingForInput: false });
         }
-        res.json({ output: stdout });
+        res.json({ output: stdout + '\nExecution completed successfully.', waitingForInput: false });
       }
     });
 
@@ -229,31 +244,121 @@ app.post('/chat', async (req, res) => {
   const { message } = req.body;
 
   try {
+    // Check if the user is asking about files
+    if (message.toLowerCase().includes('list files')) {
+      const files = fs.readdirSync(path.join(__dirname, 'files'));
+      return res.json({ response: `Here are the files in your project:\n${files.join('\n')}` });
+    }
+
+    // Check if the user is asking for the content or explanation of a specific file
+    const fileMatch = message.match(/(?:contents of|explain|what is there in) (.+?) in brief/i);
+    if (fileMatch) {
+      const filename = fileMatch[1].trim();
+      const filePath = path.join(__dirname, 'files', filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.json({ response: `The file "${filename}" does not exist.` });
+      }
+
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+
+      // Generate a brief explanation of the file's content
+      const explanation = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant that explains code files briefly.' },
+          { role: 'user', content: `Explain the following code in brief:\n\n${fileContent}` },
+        ],
+        model: 'llama-3.3-70b-versatile',
+      });
+
+      const explanationContent = explanation.choices[0]?.message?.content || 'No explanation available.';
+      return res.json({
+        response: `Here is the content of "${filename}":\n\n${fileContent}\n\nBrief Explanation:\n${explanationContent}`,
+      });
+    }
+
+    // Default chatbot response using Groq API
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: 'user', content: message }],
       model: 'llama-3.3-70b-versatile',
     });
 
     const responseContent = chatCompletion.choices[0]?.message?.content || 'No response from the model.';
-
-    // Format the response for better readability
-    const formattedResponse = responseContent
-      .replace(/```(.*?)```/gs, (match, code) => {
-        return `<div class="code-snippet"><pre>${code}</pre><button class="copy-button" onclick="copyToClipboard(\`${code}\`)">Copy</button></div>`;
-      })
-      .replace(/\n/g, '<br>') // Replace newlines with HTML line breaks
-      .replace(/(\*\*.*?\*\*)/g, '<strong>$1</strong>') // Bold text
-      .replace(/(#+\s.*)/g, '<h3>$1</h3>'); // Convert headings
-
-    res.json({ response: formattedResponse });
+    res.json({ response: responseContent });
   } catch (error) {
-    console.error('Error with Groq API:', error.message || error);
+    console.error('Error in /chat endpoint:', error.message || error);
     res.status(500).json({ error: 'Failed to process the request.' });
+  }
+});
+
+// Code completion endpoint
+app.post('/code-completion', async (req, res) => {
+  const { code, cursorPosition } = req.body;
+
+  try {
+    // Forward the request to the Python server
+    const response = await axios.post('http://localhost:5001/code-completion', {
+      code,
+    });
+
+    res.json({ completion: response.data.completion });
+  } catch (error) {
+    console.error('Error fetching code completion:', error.message || error);
+    res.status(500).json({ error: 'Failed to fetch code completion.' });
+  }
+});
+
+// Voice to code endpoint
+app.post('/voice-to-code', async (req, res) => {
+  const { message } = req.body;
+
+  try {
+    const response = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant that generates code from voice inputs.' },
+        { role: 'user', content: message },
+      ],
+      model: 'llama-3.3-70b-versatile',
+    });
+
+    const generatedCode = response.choices[0]?.message?.content || 'No code generated.';
+    res.json({ response: generatedCode });
+  } catch (error) {
+    console.error('Error in voice-to-code:', error.message || error);
+    res.status(500).json({ error: 'Failed to process the voice input.' });
+  }
+});
+
+// Image to text endpoint
+app.post('/image-to-text', async (req, res) => {
+  const { text } = req.body;
+
+  try {
+    const response = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant that processes text extracted from images.' },
+        { role: 'user', content: text },
+      ],
+      model: 'llama-3.3-70b-versatile',
+    });
+
+    const generatedResponse = response.choices[0]?.message?.content || 'No response generated.';
+    res.json({ response: generatedResponse });
+  } catch (error) {
+    console.error('Error in image-to-text:', error.message || error);
+    res.status(500).json({ error: 'Failed to process the image text.' });
   }
 });
 
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Node.js server running on http://localhost:${PORT}`);
+});
+
+// Handle process exit to clean up the Python process
+process.on('SIGINT', () => {
+  console.log('Shutting down servers...');
+  pythonProcess.kill();
+  process.exit();
 });

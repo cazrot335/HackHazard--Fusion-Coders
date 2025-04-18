@@ -6,6 +6,8 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import './App.css';
 import axios from 'axios';
+import * as monaco from 'monaco-editor';
+import Tesseract from 'tesseract.js';
 
 function debounce(func, delay) {
   let timeout;
@@ -25,12 +27,110 @@ const copyToClipboard = (text) => {
 
 const CodeSnippet = ({ code }) => (
   <div className="code-snippet">
-    <pre>{code}</pre>
     <button className="copy-button" onClick={() => copyToClipboard(code)}>
       Copy
     </button>
+    <pre>{code}</pre>
   </div>
 );
+
+const fetchCompletionSuggestions = async (code, cursorPosition) => {
+  console.log('Fetching completion for:', { code, cursorPosition });
+
+  try {
+    const response = await fetch('http://localhost:5000/code-completion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, cursorPosition }),
+    });
+
+    const data = await response.json();
+    console.log('Completion response:', data);
+    return data.completion; // Return the completion text
+  } catch (error) {
+    console.error('Error fetching code completion:', error);
+    return '';
+  }
+};
+
+const fetchCompletion = async (editor) => {
+  const code = editor.getValue(); // Get the current code from the editor
+  const cursorPosition = editor.getPosition(); // Get the cursor position
+
+  try {
+    const completion = await fetchCompletionSuggestions(code, cursorPosition);
+
+    if (completion) {
+      editor.executeEdits('', [
+        {
+          range: editor.getSelection(),
+          text: completion,
+          forceMoveMarkers: true,
+        },
+      ]);
+    }
+  } catch (error) {
+    console.error('Error fetching code completion:', error);
+  }
+};
+
+const registerCompletionProvider = (editor) => {
+  monaco.languages.registerCompletionItemProvider('javascript', {
+    provideCompletionItems: async (model, position) => {
+      console.log('Completion provider triggered:', { model, position });
+
+      const code = model.getValue();
+      const cursorPosition = {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      };
+
+      const completion = await fetchCompletionSuggestions(code, cursorPosition);
+
+      if (!completion) {
+        console.log('No completion received');
+        return { suggestions: [] };
+      }
+
+      console.log('Providing suggestions:', completion);
+
+      return {
+        suggestions: [
+          {
+            label: completion.trim(),
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: completion.trim(),
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            },
+          },
+        ],
+      };
+    },
+  });
+
+  editor.addCommand(monaco.KeyCode.Tab, () => {
+    console.log('Tab key pressed');
+    const position = editor.getPosition();
+    const code = editor.getValue();
+
+    fetchCompletionSuggestions(code, position).then((completion) => {
+      if (completion) {
+        console.log('Inserting completion:', completion);
+        editor.executeEdits('', [
+          {
+            range: editor.getSelection(),
+            text: completion.trim(),
+            forceMoveMarkers: true,
+          },
+        ]);
+      }
+    });
+  });
+};
 
 export default function App() {
   const [code, setCode] = useState('');
@@ -77,9 +177,25 @@ export default function App() {
       }
     }
 
+    // Handle terminal input
+    let inputBuffer = ''; // Buffer to store user input
     terminal.current.onData((data) => {
       if (isWaitingForInput) {
-        handleUserInput(data.trim());
+        if (data === '\r') {
+          // Process input when Enter key is pressed
+          handleUserInput(inputBuffer.trim());
+          inputBuffer = ''; // Clear the buffer after processing
+          setIsWaitingForInput(false); // Stop waiting for input
+        } else if (data === '\u0003') {
+          // Handle Ctrl+C to cancel input
+          terminal.current.writeln('^C');
+          inputBuffer = ''; // Clear the buffer
+          setIsWaitingForInput(false); // Stop waiting for input
+        } else {
+          // Append data to the input buffer and display it in the terminal
+          inputBuffer += data;
+          terminal.current.write(data);
+        }
       }
     });
 
@@ -152,7 +268,7 @@ export default function App() {
   }, 500);
 
   const handleRunCode = async () => {
-    if (!filename || isRunning) return;
+    if (!filename || isRunning) return; // Prevent multiple executions if already running
 
     const fileExtension = filename.split('.').pop();
     let derivedLanguage = '';
@@ -167,7 +283,7 @@ export default function App() {
       return;
     }
 
-    setIsRunning(true);
+    setIsRunning(true); // Set the running state to true
     terminal.current.writeln(`\r\n\x1b[1;33mRunning ${filename}...\x1b[0m`);
 
     try {
@@ -178,7 +294,7 @@ export default function App() {
         userInput: '',
       });
 
-      if (response.data.output.includes('Enter')) {
+      if (response.data.waitingForInput) {
         setIsWaitingForInput(true);
         terminal.current.write(response.data.output);
       } else {
@@ -190,12 +306,11 @@ export default function App() {
       terminal.current.writeln('\x1b[1;31mError executing code.\x1b[0m');
       console.error('Error executing code:', error);
     } finally {
-      setIsRunning(false);
+      setIsRunning(false); // Reset the running state
     }
   };
 
   const handleUserInput = async (input) => {
-    setIsWaitingForInput(false);
     terminal.current.writeln(`\x1b[1;33mUser input: ${input}\x1b[0m`);
 
     try {
@@ -206,8 +321,8 @@ export default function App() {
         userInput: input,
       });
 
-      if (response.data.output.includes('Enter')) {
-        setIsWaitingForInput(true);
+      if (response.data.waitingForInput) {
+        setIsWaitingForInput(true); // Wait for further input if required
         terminal.current.write(response.data.output);
       } else {
         setOutput(response.data.output);
@@ -315,6 +430,49 @@ export default function App() {
     }
   };
 
+  const handleVoiceInput = () => {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      console.log('Voice recognition started...');
+    };
+
+    recognition.onresult = (event) => {
+      console.log('Voice input:', event.results[0][0].transcript);
+      setUserMessage(event.results[0][0].transcript); // Set the transcribed text in the input field
+      handleSendMessage(); // Automatically send the transcribed message
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Voice recognition error:', event.error);
+    };
+
+    recognition.start();
+  };
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const imageData = e.target.result;
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(imageData, 'eng');
+        console.log('Extracted text from image:', text);
+        setUserMessage(text); // Set the extracted text in the input field
+        handleSendMessage(); // Automatically send the extracted text
+      } catch (error) {
+        console.error('Error extracting text from image:', error);
+      }
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleChatToggle = () => {
     setIsChatOpen(!isChatOpen);
   };
@@ -397,9 +555,9 @@ export default function App() {
             <Editor
               height="calc(100vh - 255px)"
               theme="vs-dark"
-              language={language}
+              language="javascript"
               value={code}
-              onChange={handleEditorChange}
+              onChange={(value) => setCode(value)}
               options={{
                 fontSize: 14,
                 minimap: { enabled: true },
@@ -410,15 +568,7 @@ export default function App() {
                 wordWrap: 'on',
               }}
               editorDidMount={(editor) => {
-                editor.onDidChangeCursorPosition((event) => {
-                  const lineNumber = event.position.lineNumber;
-                  const markers = monaco.editor.getModelMarkers({ owner: 'owner' });
-                  const error = markers.find((marker) => marker.startLineNumber === lineNumber);
-
-                  if (error) {
-                    terminal.current.writeln(`\x1b[1;31mError on line ${lineNumber}: ${error.message}\x1b[0m`);
-                  }
-                });
+                registerCompletionProvider(editor); // Attach the completion provider
               }}
             />
 
@@ -447,8 +597,13 @@ export default function App() {
                 <div
                   key={index}
                   className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
-                  dangerouslySetInnerHTML={{ __html: msg.text }}
-                />
+                >
+                  {msg.sender === 'ai' && msg.text.includes('<code>') ? (
+                    <CodeSnippet code={msg.text.replace(/<code>|<\/code>/g, '')} />
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: msg.text }} />
+                  )}
+                </div>
               ))}
             </div>
             <div className="chatbot-input">
@@ -459,6 +614,19 @@ export default function App() {
                 placeholder="Type your message..."
               />
               <button onClick={handleSendMessage}>Send</button>
+              <button onClick={handleVoiceInput}>
+                <i className="mic-icon">🎤</i>
+              </button>
+              <button onClick={() => document.getElementById('image-upload').click()}>
+                <i className="image-icon">🖼️</i> {/* Replace with an actual image icon */}
+              </button>
+              <input
+                type="file"
+                id="image-upload"
+                style={{ display: 'none' }}
+                accept="image/*"
+                onChange={handleImageUpload}
+              />
             </div>
           </div>
         )}

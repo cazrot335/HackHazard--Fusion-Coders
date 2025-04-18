@@ -417,8 +417,9 @@ button.menu-item {
   border-radius: 4px;
   position: relative;
   font-family: 'Courier New', Courier, monospace;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
   overflow-x: auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Preformatted text inside the code snippet */
@@ -426,6 +427,7 @@ button.menu-item {
   margin: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
+  font-size: 14px;
 }
 
 /* Copy button inside the code snippet */
@@ -440,6 +442,7 @@ button.menu-item {
   font-size: 12px;
   cursor: pointer;
   border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
 .copy-button:hover {

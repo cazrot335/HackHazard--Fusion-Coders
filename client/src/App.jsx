@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { PlayIcon, TerminalIcon, FileIcon, FolderIcon, PlusIcon, TrashIcon, EditIcon, MessageCircleIcon } from 'lucide-react';
+import { PlayIcon, TerminalIcon, FileIcon, FolderIcon, PlusIcon, TrashIcon, EditIcon, MessageCircleIcon, Image, Mic, StopCircle } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -10,7 +10,6 @@ import * as monaco from 'monaco-editor';
 import Tesseract from 'tesseract.js';
 import CodeBlock from './components/CodeBlock';
 import ReactMarkdown from "react-markdown";
-import { Image, Mic } from 'lucide-react';
 
 function debounce(func, delay) {
   let timeout;
@@ -146,6 +145,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [userMessage, setUserMessage] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false); // Add state for listening
   const terminalRef = useRef(null);
   const terminal = useRef(null);
   const fitAddon = useRef(null);
@@ -434,12 +434,21 @@ export default function App() {
   };
 
   const handleVoiceInput = () => {
+    if (isListening) {
+      // Stop listening
+      setIsListening(false);
+      recognition.stop(); // Stop the recognition process
+      return;
+    }
+
+    // Start listening
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'en-US';
     recognition.interimResults = false;
 
     recognition.onstart = () => {
       console.log('Voice recognition started...');
+      setIsListening(true); // Set listening state to true
     };
 
     recognition.onresult = (event) => {
@@ -450,6 +459,12 @@ export default function App() {
 
     recognition.onerror = (event) => {
       console.error('Voice recognition error:', event.error);
+      setIsListening(false); // Reset listening state on error
+    };
+
+    recognition.onend = () => {
+      console.log('Voice recognition ended.');
+      setIsListening(false); // Reset listening state when recognition ends
     };
 
     recognition.start();
@@ -673,7 +688,12 @@ const stopResizing = () => {
         placeholder="Type your message..."
       />
       <button onClick={handleSendMessage}>Send</button>
-      <button onClick={handleVoiceInput}><Mic size={18} /></button>
+      <button
+        className={`voice-button ${isListening ? 'listening' : ''}`}
+        onClick={handleVoiceInput}
+      >
+        {isListening ? <StopCircle size={18} /> : <Mic size={18} />}
+      </button>
       <button onClick={() => document.getElementById('image-upload').click()}>
         <Image size={18} />
       </button>

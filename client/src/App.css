@@ -245,7 +245,7 @@ button.menu-item {
 
 /* Chat section */
 .chatbot {
-  width: 300px;
+  width: 340px;
   background-color: #252526;
   border-left: 1px solid #3e3e42;
   display: flex;
@@ -339,7 +339,7 @@ button.menu-item {
 }
 
 .chatbot {
-  width: 300px;
+  width: 340px;
   background-color: #252526;
   border-left: 1px solid #3e3e42;
   display: flex;
@@ -494,4 +494,31 @@ button.menu-item {
 
 .copy-button:hover {
   background-color: #1177bb;
+}
+
+/* Styles for the mic and stop button */
+.voice-button {
+  background-color: #0e639c;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.voice-button:hover {
+  background-color: #1177bb;
+}
+
+.voice-button.listening {
+  background-color: #bb0e0e; /* Red color for stop button */
+}
+
+.voice-button.listening:hover {
+  background-color: #d11a1a; /* Lighter red on hover */
 }

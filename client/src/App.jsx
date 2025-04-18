@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { PlayIcon, TerminalIcon, FileIcon, FolderIcon, PlusIcon, TrashIcon, EditIcon } from 'lucide-react';
+import { PlayIcon, TerminalIcon, FileIcon, FolderIcon, PlusIcon, TrashIcon, EditIcon, MessageCircleIcon } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -22,25 +22,28 @@ export default function App() {
   const [language, setLanguage] = useState('');
   const [files, setFiles] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [isWaitingForInput, setIsWaitingForInput] = useState(false); // New state for input handling
-  const [chatMessages, setChatMessages] = useState([]); // Chat messages state
-  const [userMessage, setUserMessage] = useState(''); // User message state
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [userMessage, setUserMessage] = useState('');
+  const [isChatOpen, setIsChatOpen] = useState(false); // State for chat section visibility
   const terminalRef = useRef(null);
   const terminal = useRef(null);
   const fitAddon = useRef(null);
-  const hasInitializedTerminal = useRef(false); // Track if the terminal has been initialized
+  const hasInitializedTerminal = useRef(false);
+  const terminalContainerRef = useRef(null); // Ref for terminal container
 
   useEffect(() => {
-    // Initialize xterm.js terminal with fit addon
+    // Initialize xterm.js terminal with fit addon only if not already initialized
+  if (!terminal.current) {
     terminal.current = new Terminal({
       fontSize: 13,
       fontFamily: '"Consolas", "Courier New", monospace',
       theme: {
-        background: '#121212',
-        foreground: '#d4d4d4',
-        cursor: '#ffffff',
-        cursorAccent: '#000000',
-        selection: 'rgba(255, 255, 255, 0.3)',
+        background: "#121212",
+        foreground: "#d4d4d4",
+        cursor: "#ffffff",
+        cursorAccent: "#000000",
+        selection: "rgba(255, 255, 255, 0.3)",
       },
     });
 
@@ -51,21 +54,19 @@ export default function App() {
       terminal.current.open(terminalRef.current);
       fitAddon.current.fit();
 
-      // Display the welcome message only once
       if (!hasInitializedTerminal.current) {
         terminal.current.writeln('\x1b[1;34mWelcome to the Web IDE Terminal!\x1b[0m');
         hasInitializedTerminal.current = true;
       }
     }
+  }
 
-    // Handle user input in the terminal
     terminal.current.onData((data) => {
       if (isWaitingForInput) {
         handleUserInput(data.trim());
       }
     });
 
-    // Handle window resize to fit terminal
     const handleResize = () => {
       if (fitAddon.current) {
         fitAddon.current.fit();
@@ -78,8 +79,8 @@ export default function App() {
     };
   }, [isWaitingForInput]);
 
+
   useEffect(() => {
-    // Fetch files from the backend
     const fetchFiles = async () => {
       try {
         const response = await axios.get('http://localhost:5000/files');
@@ -97,7 +98,6 @@ export default function App() {
 
     if (!filename) return;
 
-    // Derive the language from the file extension
     const fileExtension = filename.split('.').pop();
     let derivedLanguage = '';
     if (fileExtension === 'py') {
@@ -117,7 +117,6 @@ export default function App() {
       });
 
       if (response.data.errors) {
-        // Highlight errors in the editor
         const markers = response.data.errors.map((error) => ({
           startLineNumber: error.line,
           startColumn: error.column,
@@ -129,19 +128,17 @@ export default function App() {
 
         monaco.editor.setModelMarkers(monaco.editor.getModels()[0], 'owner', markers);
       } else {
-        // Clear markers if no errors
         monaco.editor.setModelMarkers(monaco.editor.getModels()[0], 'owner', []);
       }
     } catch (error) {
       console.error('Error validating code:', error);
       terminal.current.writeln('\x1b[1;31mError validating code. Check the backend logs for details.\x1b[0m');
     }
-  }, 500); // Debounce delay of 500ms
+  }, 500);
 
   const handleRunCode = async () => {
     if (!filename || isRunning) return;
 
-    // Derive the language from the file extension
     const fileExtension = filename.split('.').pop();
     let derivedLanguage = '';
     if (fileExtension === 'py') {
@@ -163,15 +160,13 @@ export default function App() {
         filename,
         code,
         language: derivedLanguage,
-        userInput: '', // Initially no user input
+        userInput: '',
       });
 
       if (response.data.output.includes('Enter')) {
-        // If the program is waiting for input
         setIsWaitingForInput(true);
-        terminal.current.write(response.data.output); // Append output
+        terminal.current.write(response.data.output);
       } else {
-        // If the program has completed execution
         setOutput(response.data.output);
         terminal.current.write(`\x1b[32m${response.data.output}\x1b[0m`);
         terminal.current.writeln('\r\n\x1b[1;32mExecution completed successfully.\x1b[0m');
@@ -193,15 +188,13 @@ export default function App() {
         filename,
         code,
         language,
-        userInput: input, // Pass user input to the backend
+        userInput: input,
       });
 
       if (response.data.output.includes('Enter')) {
-        // If the program is still waiting for input
         setIsWaitingForInput(true);
-        terminal.current.write(response.data.output); // Append output
+        terminal.current.write(response.data.output);
       } else {
-        // If the program has completed execution
         setOutput(response.data.output);
         terminal.current.write(`\x1b[32m${response.data.output}\x1b[0m`);
         terminal.current.writeln('\r\n\x1b[1;32mExecution completed successfully.\x1b[0m');
@@ -215,7 +208,6 @@ export default function App() {
   const handleFileClick = async (file) => {
     setFilename(file.name);
 
-    // Derive the language from the file extension
     const fileExtension = file.name.split('.').pop();
     let derivedLanguage = '';
     if (fileExtension === 'py') {
@@ -286,13 +278,12 @@ export default function App() {
     }
   };
 
+  // chat 
   const handleSendMessage = async () => {
     if (!userMessage.trim()) return;
 
-    // Add user message to chat
     setChatMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
 
-    // Call AI API to get a response
     const response = await fetch('http://localhost:5000/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -300,9 +291,30 @@ export default function App() {
     });
     const data = await response.json();
 
-    // Add AI response to chat
     setChatMessages((prev) => [...prev, { sender: 'ai', text: data.response }]);
     setUserMessage('');
+  };
+
+  const handleChatToggle = () => {
+    setIsChatOpen(!isChatOpen);
+  };
+
+  const handleTerminalResize = (e) => {
+    const terminalContainer = terminalContainerRef.current;
+    const newHeight = window.innerHeight - e.clientY - 40; // Adjust for top bar height
+    if (newHeight >= 100 && newHeight <= window.innerHeight * 0.5) {
+      terminalContainer.style.height = `${newHeight}px`;
+    }
+  };
+
+  const startTerminalResize = () => {
+    window.addEventListener('mousemove', handleTerminalResize);
+    window.addEventListener('mouseup', stopTerminalResize);
+  };
+
+  const stopTerminalResize = () => {
+    window.removeEventListener('mousemove', handleTerminalResize);
+    window.removeEventListener('mouseup', stopTerminalResize);
   };
 
   return (
@@ -316,18 +328,24 @@ export default function App() {
             New File
           </button>
         </div>
-        <button
-          className={`run-button ${isRunning ? 'loading' : ''}`}
-          onClick={handleRunCode}
-          disabled={isRunning}
-        >
-          <PlayIcon size={14} className="icon" />
-          {isRunning ? 'Running...' : 'Run Code'}
-        </button>
+        <div className="top-bar-actions">
+          <button className="menu-item" onClick={handleChatToggle}>
+            <MessageCircleIcon size={14} />
+            Chat
+          </button>
+          <button
+            className={`run-button ${isRunning ? 'loading' : ''}`}
+            onClick={handleRunCode}
+            disabled={isRunning}
+          >
+            <PlayIcon size={14} className="icon" />
+            {isRunning ? 'Running...' : 'Run Code'}
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
-      <div className="main-content">
+      <div className={`main-content ${isChatOpen ? 'chat-open' : ''}`}>
         {/* File explorer */}
         <div className="file-explorer">
           <div className="explorer-header">EXPLORER</div>
@@ -389,7 +407,14 @@ export default function App() {
             />
 
             {/* Terminal */}
-            <div className="terminal">
+            <div
+              ref={terminalContainerRef}
+              className="terminal-container"
+            >
+              <div
+                className="terminal-resize-handle"
+                onMouseDown={startTerminalResize}
+              ></div>
               <div className="terminal-header">
                 <TerminalIcon size={14} className="icon" />
                 <span>TERMINAL</span>
@@ -399,30 +424,32 @@ export default function App() {
           </div>
         </div>
 
-        {/* Chatbot Section */}
-        <div className="chatbot">
-          <div className="chatbot-header">AI Assistant</div>
-          <div className="chatbot-messages">
-            {chatMessages.map((msg, index) => (
-              <div
-                key={index}
-                className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
-              >
-                {msg.text}
-              </div>
-            ))}
+        {/* Chat Section */}
+        {isChatOpen && (
+          <div className="chatbot">
+            <div className="chatbot-header">AI Assistant</div>
+            <div className="chatbot-messages">
+              {chatMessages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
+                >
+                  {msg.text}
+                </div>
+              ))}
+            </div>
+            <div className="chatbot-input">
+              <input
+                type="text"
+                placeholder="Ask me anything..."
+                value={userMessage}
+                onChange={(e) => setUserMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button onClick={handleSendMessage}>Send</button>
+            </div>
           </div>
-          <div className="chatbot-input">
-            <input
-              type="text"
-              placeholder="Ask me anything..."
-              value={userMessage}
-              onChange={(e) => setUserMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            />
-            <button onClick={handleSendMessage}>Send</button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Status bar */}

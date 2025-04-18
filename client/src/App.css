@@ -145,15 +145,12 @@ button.menu-item {
 
 /* Terminal styles */
 .terminal {
-  height: 180px;
+  height: 200px; /* Fixed height */
   background-color: #1e1e1e;
   border-top: 1px solid #3e3e42;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  resize: vertical; /* Allow vertical resizing */
-  min-height: 100px; /* Minimum height for the terminal */
-  max-height: 500px; /* Maximum height for the terminal */
+  overflow-y: auto;
 }
 
 .terminal-header {
@@ -166,7 +163,6 @@ button.menu-item {
   display: flex;
   align-items: center;
   border-bottom: 1px solid #3e3e42;
-  cursor: ns-resize; /* Show resize cursor */
 }
 
 .terminal-header .icon {
@@ -177,7 +173,6 @@ button.menu-item {
 .terminal-output {
   flex-grow: 1;
   padding: 8px 12px;
-  overflow-y: auto;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 13px;
   background-color: #121212;
@@ -225,7 +220,7 @@ button.menu-item {
   }
   
   .terminal {
-    height: 150px;
+    height: 200px;
   }
 }
 

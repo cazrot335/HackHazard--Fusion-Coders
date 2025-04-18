@@ -7,6 +7,14 @@ import 'xterm/css/xterm.css';
 import './App.css';
 import axios from 'axios';
 
+function debounce(func, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), delay);
+  };
+}
+
 export default function App() {
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
@@ -15,6 +23,8 @@ export default function App() {
   const [files, setFiles] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isWaitingForInput, setIsWaitingForInput] = useState(false); // New state for input handling
+  const [chatMessages, setChatMessages] = useState([]); // Chat messages state
+  const [userMessage, setUserMessage] = useState(''); // User message state
   const terminalRef = useRef(null);
   const terminal = useRef(null);
   const fitAddon = useRef(null);
@@ -82,9 +92,51 @@ export default function App() {
     fetchFiles();
   }, []);
 
-  const handleEditorChange = (value) => {
+  const handleEditorChange = debounce(async (value) => {
     setCode(value || '');
-  };
+
+    if (!filename) return;
+
+    // Derive the language from the file extension
+    const fileExtension = filename.split('.').pop();
+    let derivedLanguage = '';
+    if (fileExtension === 'py') {
+      derivedLanguage = 'python';
+    } else if (fileExtension === 'js') {
+      derivedLanguage = 'javascript';
+    } else if (fileExtension === 'cpp') {
+      derivedLanguage = 'cpp';
+    } else {
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://localhost:5000/validate', {
+        code: value,
+        language: derivedLanguage,
+      });
+
+      if (response.data.errors) {
+        // Highlight errors in the editor
+        const markers = response.data.errors.map((error) => ({
+          startLineNumber: error.line,
+          startColumn: error.column,
+          endLineNumber: error.line,
+          endColumn: error.column + 1,
+          message: error.message,
+          severity: monaco.MarkerSeverity.Error,
+        }));
+
+        monaco.editor.setModelMarkers(monaco.editor.getModels()[0], 'owner', markers);
+      } else {
+        // Clear markers if no errors
+        monaco.editor.setModelMarkers(monaco.editor.getModels()[0], 'owner', []);
+      }
+    } catch (error) {
+      console.error('Error validating code:', error);
+      terminal.current.writeln('\x1b[1;31mError validating code. Check the backend logs for details.\x1b[0m');
+    }
+  }, 500); // Debounce delay of 500ms
 
   const handleRunCode = async () => {
     if (!filename || isRunning) return;
@@ -234,6 +286,25 @@ export default function App() {
     }
   };
 
+  const handleSendMessage = async () => {
+    if (!userMessage.trim()) return;
+
+    // Add user message to chat
+    setChatMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
+
+    // Call AI API to get a response
+    const response = await fetch('http://localhost:5000/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userMessage }),
+    });
+    const data = await response.json();
+
+    // Add AI response to chat
+    setChatMessages((prev) => [...prev, { sender: 'ai', text: data.response }]);
+    setUserMessage('');
+  };
+
   return (
     <div className="app">
       {/* Top bar */}
@@ -280,46 +351,83 @@ export default function App() {
           </div>
         </div>
 
-        {/* Editor and output */}
-        <div className="editor-output">
-          <div className="editor-tabs">
-            <div className="tab active-tab">
-              <span>{filename || 'Untitled'}</span>
+        {/* Editor and Terminal */}
+        <div className="editor-terminal">
+          <div className="editor-output">
+            <div className="editor-tabs">
+              <div className="tab active-tab">
+                <span>{filename || 'Untitled'}</span>
+              </div>
+            </div>
+
+            <Editor
+              height="calc(100vh - 255px)"
+              theme="vs-dark"
+              language={language}
+              value={code}
+              onChange={handleEditorChange}
+              options={{
+                fontSize: 14,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                lineNumbers: 'on',
+                tabSize: 2,
+                wordWrap: 'on',
+              }}
+              editorDidMount={(editor) => {
+                editor.onDidChangeCursorPosition((event) => {
+                  const lineNumber = event.position.lineNumber;
+                  const markers = monaco.editor.getModelMarkers({ owner: 'owner' });
+                  const error = markers.find((marker) => marker.startLineNumber === lineNumber);
+
+                  if (error) {
+                    terminal.current.writeln(`\x1b[1;31mError on line ${lineNumber}: ${error.message}\x1b[0m`);
+                  }
+                });
+              }}
+            />
+
+            {/* Terminal */}
+            <div className="terminal">
+              <div className="terminal-header">
+                <TerminalIcon size={14} className="icon" />
+                <span>TERMINAL</span>
+              </div>
+              <div ref={terminalRef} className="terminal-output"></div>
             </div>
           </div>
+        </div>
 
-          <Editor
-            height="calc(100vh - 255px)"
-            theme="vs-dark"
-            language={language}
-            value={code}
-            onChange={handleEditorChange}
-            options={{
-              fontSize: 14,
-              minimap: { enabled: true },
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              lineNumbers: 'on',
-              tabSize: 2,
-              wordWrap: 'on',
-            }}
-          />
-
-          {/* Terminal */}
-          <div className="terminal">
-            <div className="terminal-header">
-              <TerminalIcon size={14} className="icon" />
-              <span>TERMINAL</span>
-            </div>
-            <div ref={terminalRef} className="terminal-output"></div>
+        {/* Chatbot Section */}
+        <div className="chatbot">
+          <div className="chatbot-header">AI Assistant</div>
+          <div className="chatbot-messages">
+            {chatMessages.map((msg, index) => (
+              <div
+                key={index}
+                className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
+              >
+                {msg.text}
+              </div>
+            ))}
+          </div>
+          <div className="chatbot-input">
+            <input
+              type="text"
+              placeholder="Ask me anything..."
+              value={userMessage}
+              onChange={(e) => setUserMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            />
+            <button onClick={handleSendMessage}>Send</button>
           </div>
         </div>
       </div>
 
       {/* Status bar */}
       <div className="status-bar">
-        <div>{language.toUpperCase()}</div>
-        <div>UTF-8</div>
+        <div>Status: Ready</div>
       </div>
     </div>
   );

@@ -8,6 +8,9 @@ import './App.css';
 import axios from 'axios';
 import * as monaco from 'monaco-editor';
 import Tesseract from 'tesseract.js';
+import CodeBlock from './components/CodeBlock';
+import ReactMarkdown from "react-markdown";
+import { Image, Mic } from 'lucide-react';
 
 function debounce(func, delay) {
   let timeout;
@@ -495,6 +498,35 @@ export default function App() {
     window.removeEventListener('mouseup', stopTerminalResize);
   };
 
+  const messagesEndRef = useRef(null);
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [chatMessages]);
+
+const chatRef = useRef(null);
+const isResizing = useRef(false);
+
+const startResizing = (e) => {
+  isResizing.current = true;
+  document.addEventListener("mousemove", resizeChat);
+  document.addEventListener("mouseup", stopResizing);
+};
+
+const resizeChat = (e) => {
+  if (!isResizing.current || !chatRef.current) return;
+  const newWidth = window.innerWidth - e.clientX;
+  if (newWidth > 250 && newWidth < 600) {
+    chatRef.current.style.width = `${newWidth}px`;
+  }
+};
+
+const stopResizing = () => {
+  isResizing.current = false;
+  document.removeEventListener("mousemove", resizeChat);
+  document.removeEventListener("mouseup", stopResizing);
+};
+
   return (
     <div className="app">
       <div className="top-bar">
@@ -589,47 +621,72 @@ export default function App() {
           </div>
         </div>
 
+        {/* Chat Section */}
         {isChatOpen && (
-          <div className="chatbot">
-            <div className="chatbot-header">AI Assistant</div>
-            <div className="chatbot-messages">
-              {chatMessages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
-                >
-                  {msg.sender === 'ai' && msg.text.includes('<code>') ? (
-                    <CodeSnippet code={msg.text.replace(/<code>|<\/code>/g, '')} />
+  <div className="chatbot" ref={chatRef}>
+    <div className="chatbot-resizer" onMouseDown={startResizing}></div>
+
+    <div className="chatbot-header">AI Assistant</div>
+
+    <div className="chatbot-messages">
+      {chatMessages.map((msg, index) => (
+        <div
+          key={index}
+          className={`chatbot-message ${msg.sender === 'user' ? 'user' : 'ai'}`}
+        >
+          {msg.sender === 'ai' ? (
+            <ReactMarkdown
+              components={{
+                code({ node, inline, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  return !inline ? (
+                    <CodeBlock
+                      language={match ? match[1] : 'text'}
+                      value={String(children).replace(/\n$/, '')}
+                    />
                   ) : (
-                    <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="chatbot-input">
-              <input
-                type="text"
-                value={userMessage}
-                onChange={(e) => setUserMessage(e.target.value)}
-                placeholder="Type your message..."
-              />
-              <button onClick={handleSendMessage}>Send</button>
-              <button onClick={handleVoiceInput}>
-                <i className="mic-icon">🎤</i>
-              </button>
-              <button onClick={() => document.getElementById('image-upload').click()}>
-                <i className="image-icon">🖼️</i> {/* Replace with an actual image icon */}
-              </button>
-              <input
-                type="file"
-                id="image-upload"
-                style={{ display: 'none' }}
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
-            </div>
-          </div>
-        )}
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {msg.text}
+            </ReactMarkdown>
+          ) : (
+            msg.text
+          )}
+        </div>
+      ))}
+      <div ref={messagesEndRef} />
+    </div>
+
+    <div className="chatbot-input">
+      <input
+        type="text"
+        value={userMessage}
+        onChange={(e) => setUserMessage(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSendMessage();
+        }}
+        placeholder="Type your message..."
+      />
+      <button onClick={handleSendMessage}>Send</button>
+      <button onClick={handleVoiceInput}><Mic size={18} /></button>
+      <button onClick={() => document.getElementById('image-upload').click()}>
+        <Image size={18} />
+      </button>
+      <input
+        type="file"
+        id="image-upload"
+        style={{ display: 'none' }}
+        accept="image/*"
+        onChange={handleImageUpload}
+      />
+    </div>
+  </div>
+)}
       </div>
 
       <div className="status-bar">

@@ -254,7 +254,16 @@ button.menu-item {
   right: 0;
   top: 40px;
   bottom: 0;
-  z-index: 10; /* Ensure it appears above other elements */
+  z-index: 10;
+  transition: transform 0.3s ease-in-out;
+}
+
+@media (max-width: 600px) {
+  .chatbot {
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
 }
 
 .chatbot-header {
@@ -269,6 +278,8 @@ button.menu-item {
   flex-grow: 1;
   padding: 8px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .chatbot-message {
@@ -276,6 +287,7 @@ button.menu-item {
   padding: 8px;
   border-radius: 4px;
   font-size: 14px;
+  max-width: 90%;
 }
 
 .chatbot-message.user {
@@ -312,17 +324,52 @@ button.menu-item {
   background-color: #0e639c;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 10px;
   font-size: 14px;
   cursor: pointer;
   border-radius: 4px;
   margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chatbot-input button:hover {
   background-color: #1177bb;
 }
 
+.chatbot {
+  width: 300px;
+  background-color: #252526;
+  border-left: 1px solid #3e3e42;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  right: 0;
+  top: 40px;
+  bottom: 0;
+  z-index: 10;
+  transition: width 0.2s ease;
+}
+
+.chatbot-resizer {
+  width: 5px;
+  cursor: col-resize;
+  background-color: transparent;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 11;
+}
+
+@media (max-width: 600px) {
+  .chatbot {
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
+}
 /* XTerm.js styling overrides */
 .xterm {
   padding: 4px;

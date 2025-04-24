@@ -1,3 +1,4 @@
 files/
 .env
 /temp
+/node_modules

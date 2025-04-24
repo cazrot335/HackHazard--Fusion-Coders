@@ -232,6 +232,20 @@ export default function App() {
 
     if (!filename) return;
 
+    try {
+      // Save the updated code to the backend
+      await axios.post('http://localhost:5000/update-code', {
+        filename,
+        code: value,
+      });
+
+      terminal.current.writeln(`\x1b[1;34mAuto-saved ${filename}\x1b[0m`);
+    } catch (error) {
+      console.error('Error saving file:', error);
+      terminal.current.writeln('\x1b[1;31mError saving file. Check the backend logs for details.\x1b[0m');
+    }
+
+    // Existing logic for language detection and validation
     const fileExtension = filename.split('.').pop();
     let derivedLanguage = '';
     if (fileExtension === 'py') {
@@ -267,6 +281,21 @@ export default function App() {
     } catch (error) {
       console.error('Error validating code:', error);
       terminal.current.writeln('\x1b[1;31mError validating code. Check the backend logs for details.\x1b[0m');
+    }
+
+    // New logic for Fluvio integration
+    try {
+      const ws = new WebSocket('ws://localhost:8080');
+      ws.onopen = () => {
+        ws.send(
+          JSON.stringify({
+            filename,
+            code: value,
+          })
+        );
+      };
+    } catch (error) {
+      console.error('Error sending code update to WebSocket:', error);
     }
   }, 500);
 
@@ -542,11 +571,26 @@ const stopResizing = () => {
   document.removeEventListener("mouseup", stopResizing);
 };
 
+  useEffect(() => {
+  const ws = new WebSocket('ws://localhost:8080');
+
+  ws.onmessage = (event) => {
+    const { filename: updatedFilename, code: updatedCode } = JSON.parse(event.data);
+
+    // Update the editor if the file matches the current file
+    if (updatedFilename === filename) {
+      setCode(updatedCode);
+    }
+  };
+
+  return () => ws.close();
+}, [filename]);
+
   return (
     <div className="app">
       <div className="top-bar">
         <div className="menu">
-          <span className="menu-item">Web IDE</span>
+          <span className="menu-item">DevNest AI</span>
           <button className="menu-item" onClick={handleCreateFile}>
             <PlusIcon size={14} />
             New File

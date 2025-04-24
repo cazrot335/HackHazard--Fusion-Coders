@@ -7,6 +7,8 @@ const path = require('path');
 const dotenv = require('dotenv');
 const Groq = require('groq-sdk');
 const axios = require('axios');
+const WebSocket = require('ws');
+const Fluvio = require('@fluvio/client');
 
 // Load environment variables
 dotenv.config();
@@ -361,4 +363,81 @@ process.on('SIGINT', () => {
   console.log('Shutting down servers...');
   pythonProcess.kill();
   process.exit();
+});
+
+// Initialize Fluvio producer
+let codeCollaborationProducer;
+
+(async () => {
+  try {
+    const fluvio = new Fluvio();
+
+    // Connect to the Fluvio cluster
+    console.log("Connecting to Fluvio...");
+    await fluvio.connect();
+
+    // Create a producer for the 'code-collaboration' topic
+    codeCollaborationProducer = await fluvio.topicProducer('code-collaboration');
+    console.log("Fluvio producer initialized for code collaboration.");
+
+    // Create a consumer for the 'code-collaboration' topic
+    const codeCollaborationConsumer = await fluvio.partitionConsumer('code-collaboration', 0);
+
+    // WebSocket server for real-time updates
+    const wss = new WebSocket.Server({ port: 8080 });
+
+    wss.on('connection', (ws) => {
+      console.log('WebSocket client connected');
+
+      const consumerStream = codeCollaborationConsumer.stream(async (record) => {
+        const message = record.valueString();
+
+        // Send the message to all connected clients
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
+      });
+
+      ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+        consumerStream.cancel(); // Cancel the stream when the client disconnects
+      });
+    });
+
+    console.log("Fluvio consumer initialized for real-time code collaboration.");
+  } catch (error) {
+    console.error("Error initializing Fluvio:", error);
+  }
+})();
+
+app.post('/update-code', async (req, res) => {
+  const { filename, code } = req.body;
+
+  if (!filename || !code) {
+    return res.status(400).json({ error: 'Missing required fields: filename or code.' });
+  }
+
+  try {
+    // Save the code to the file
+    const filePath = path.join(filesDir, filename);
+    fs.writeFileSync(filePath, code);
+
+    // Check if the producer is initialized
+    if (!codeCollaborationProducer) {
+      console.error('Fluvio producer is not initialized.');
+      return res.status(500).json({ error: 'Fluvio producer is not initialized.' });
+    }
+
+    // Publish the code change to Fluvio
+    await codeCollaborationProducer.send(
+      JSON.stringify({ filename, code, timestamp: Date.now() })
+    );
+
+    res.json({ message: 'Code updated and broadcasted successfully.' });
+  } catch (error) {
+    console.error('Error updating code:', error);
+    res.status(500).json({ error: 'Failed to update code.' });
+  }
 });

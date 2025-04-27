@@ -1,21 +1,43 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
 const cors = require('cors');
+const bodyParser = require('body-parser');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const path = require('path');
-const dotenv = require('dotenv');
+const dotenv = require("dotenv");
+dotenv.config();
+const mongoose = require("mongoose");
+const connectDB = require("./config/db");
+const passport = require("passport");
+const session = require("express-session");
 const Groq = require('groq-sdk');
 const axios = require('axios');
 const WebSocket = require('ws');
 const Fluvio = require('@fluvio/client');
+require("./config/passport");
+const authRoutes = require("./routes/authRoutes");
 
-// Load environment variables
-dotenv.config();
+connectDB();
 
 const app = express();
-app.use(cors());
+
+app.use(express.json());
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  credentials: true
+}));
 app.use(bodyParser.json());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use("/auth", authRoutes);
 
 const filesDir = path.join(__dirname, 'files');
 if (!fs.existsSync(filesDir)) {

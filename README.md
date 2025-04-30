@@ -3,7 +3,7 @@
 ---
 
 ## **Overview**
-HackHazard--Fusion-Coders is a web-based IDE that integrates advanced features like **code execution**, **syntax validation**, **real-time code completion**, **voice-to-code**, and **image-to-text processing**. It is designed to provide a seamless coding experience with AI-powered assistance.
+DevNest AI is a web-based IDE that integrates advanced features like **code execution**, **syntax validation**, **real-time code completion**, **voice-to-code**, and **image-to-text processing**. It is designed to provide a seamless coding experience with AI-powered assistance.
 
 ---
 
